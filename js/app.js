@@ -575,7 +575,7 @@ function renderRecibo(quote, fecha) {
         <div class="logo-tagline">Inventario de lujo por mensualidad</div>
       </div>
       <div class="recibo-title">
-        <h2>Propuesta de colocación</h2>
+        <h2>Cotización</h2>
         <div class="meta">
           Fecha: ${fmt(fechaObj)}<br/>
           Folio: ${escapeHtml(quote.folio)}
@@ -649,14 +649,14 @@ function renderRecibo(quote, fecha) {
 
 function wireReciboButtons(quote) {
   const waMsg = encodeURIComponent(
-    `Hola, te comparto la propuesta ${quote.folio} de Spazio Classe para ${quote.salon}: paquete ${quote.paquete_nombre}, mensualidad de ${money(quote.mensualidad_anio1)}/mes el primer año. En un momento te mando el PDF. ¡Gracias!`
+    `Hola, te comparto la cotización ${quote.folio} de Spazio Classe para ${quote.salon}: paquete ${quote.paquete_nombre}, mensualidad de ${money(quote.mensualidad_anio1)}/mes el primer año. En un momento te mando el PDF. ¡Gracias!`
   );
   const phoneDigits = (quote.phone || '').replace(/\D/g, '');
   document.getElementById('reciboWhatsBtn').onclick = () => {
     window.open(`https://wa.me/${phoneDigits}?text=${waMsg}`, '_blank');
   };
   document.getElementById('reciboMailBtn').onclick = () => {
-    const subject = encodeURIComponent('Propuesta ' + quote.folio + ' · Spazio Classe');
+    const subject = encodeURIComponent('Cotización ' + quote.folio + ' · Spazio Classe');
     window.open(`mailto:${quote.email || ''}?subject=${subject}&body=${waMsg}`, '_blank');
   };
 }
