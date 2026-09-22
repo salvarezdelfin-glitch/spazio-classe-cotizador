@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spazio Classe · Cotizador</title>
+<meta name="theme-color" content="#0B0B09" />
+<meta name="description" content="Cotizador interno de Spazio Classe — paquetes de inventario de lujo y mensualidad por salón" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Spazio Classe" />
+<link rel="stylesheet" href="css/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="logo-wrap"><span class="wordmark">Spazio <span>Classe</span></span></div>
+    <div class="card">
+      <h1 id="authTitle">Iniciar sesión</h1>
+      <div class="sub" id="authSub">Cotizador interno · Spazio Classe</div>
+      <div class="field">
+        <label>Correo</label>
+        <div class="input-wrap"><input id="loginUser" type="email" placeholder="tucorreo@ejemplo.com" /></div>
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <div class="input-wrap"><input id="loginPass" type="password" placeholder="••••••••" /></div>
+      </div>
+      <button class="btn-primary" id="authSubmitBtn" onclick="handleAuthSubmit()">Entrar</button>
+      <div id="loginError" class="login-err hidden"></div>
+      <div class="setup-note">
+        <button type="button" id="toggleSignupBtn" class="link-btn" onclick="toggleSignupMode()">¿Primera vez? Crear tu cuenta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside>
+    <div class="sidebar-logo"><span class="wordmark">Spazio <span>Classe</span></span></div>
+    <div class="nav-section-title">Menú</div>
+    <nav>
+      <button class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">📊 Dashboard</button>
+      <button class="nav-item" data-view="salones" onclick="showView('salones')">🏛️ Salones</button>
+      <button class="nav-item" data-view="cotizador" onclick="showView('cotizador')">🧾 Cotizador</button>
+      <button class="nav-item" data-view="historial" onclick="showView('historial')">📋 Historial</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <span id="currentUserLabel">—</span>
+        <button class="logout-btn" onclick="handleLogout()">Salir</button>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div id="view-dashboard">
+      <div class="topbar">
+        <div>
+          <h2>Dashboard</h2>
+          <div class="sub" id="dashboardDate"></div>
+        </div>
+        <button class="btn-accent-sm" onclick="showView('cotizador')">+ Nueva cotización</button>
+      </div>
+      <div class="cards-grid" id="statsGrid"></div>
+      <div class="panels-grid">
+        <div class="panel">
+          <h3>Salones registrados</h3>
+          <div id="dashSalonesList"></div>
+        </div>
+        <div class="panel">
+          <h3>Cotizaciones (todas)</h3>
+          <div id="dashQuotesList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-salones" class="hidden">
+      <div class="topbar">
+        <div><h2>Salones</h2><div class="sub">Todos los salones de eventos registrados</div></div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Salón</th><th>Ciudad</th><th>Cotizaciones</th><th>Última cotización</th><th>Mensualidad vigente</th></tr></thead>
+          <tbody id="salonesTableBody"></tbody>
+        </table>
+        <div id="salonesEmpty" class="empty-state hidden">Aún no hay salones. Se agregan automáticamente al generar una cotización.</div>
+      </div>
+    </div>
+
+    <div id="view-cotizador" class="hidden">
+      <div class="topbar">
+        <div><h2>Cotizador</h2><div class="sub">Elige un paquete existente o arma uno nuevo — la mensualidad se calcula sola</div></div>
+      </div>
+
+      <div class="quote-form">
+        <h3 style="margin-top:0;font-weight:600;font-size:16px;">Empieza desde un paquete (opcional)</h3>
+        <div class="sub" style="color:var(--text-secondary);font-size:12px;margin:-8px 0 14px;">Carga las piezas exactas del paquete a la tabla de abajo — luego ajústalas, quítalas o agrega otras hasta que quede exactamente como lo pide el cliente.</div>
+        <div class="package-grid" id="packageGrid"></div>
+      </div>
+
+      <div class="quote-form">
+        <h3 style="margin-top:0;font-weight:600;font-size:16px;">Piezas del paquete</h3>
+
+        <div class="catalog-box">
+          <div class="catalog-tabs" id="catalogTabs"></div>
+          <div class="input-wrap" style="margin-bottom:10px;">
+            <input id="catalogSearch" placeholder="Buscar pieza por nombre o clave..." oninput="renderCatalogItems()" />
+          </div>
+          <div class="catalog-items" id="catalogItems"></div>
+        </div>
+
+        <div class="col-headers" style="grid-template-columns: .8fr 1.5fr 2fr .5fr .9fr .9fr auto;">
+          <div>Clave</div><div>Producto</div><div>Descripción</div><div>Cant.</div><div>Valor unitario</div><div>Subtotal</div><div></div>
+        </div>
+        <div id="builderRows"></div>
+        <button class="add-row-btn" onclick="addBuilderRow()">+ Agregar pieza manual</button>
+
+        <div class="form-row" style="margin-top:16px;">
+          <div class="field">
+            <label>Guardar esta combinación como paquete reutilizable (opcional)</label>
+            <div class="input-wrap"><input id="builderName" placeholder="Ej. Luxury, Gold ampliado, Paquete Terraza Jardín..." /></div>
+          </div>
+        </div>
+        <button class="btn-ghost-sm" onclick="saveBuilderAsPackage()">💾 Guardar como paquete reutilizable</button>
+      </div>
+
+      <div class="quote-form">
+        <h3 style="margin-top:0;font-weight:600;font-size:16px;">Datos del salón</h3>
+        <div class="form-row">
+          <div class="field">
+            <label>Nombre del salón</label>
+            <div class="input-wrap"><input id="quoteSalon" placeholder="Nombre del salón de eventos" /></div>
+          </div>
+          <div class="field">
+            <label>Folio</label>
+            <div class="input-wrap"><input id="quoteFolio" disabled /></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Persona de contacto</label>
+            <div class="input-wrap"><input id="quoteContacto" placeholder="Nombre de contacto" /></div>
+          </div>
+          <div class="field">
+            <label>Teléfono (WhatsApp)</label>
+            <div class="input-wrap"><input id="quotePhone" placeholder="10 dígitos" /></div>
+          </div>
+          <div class="field">
+            <label>Correo (opcional)</label>
+            <div class="input-wrap"><input id="quoteEmail" placeholder="correo@ejemplo.com" /></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Ciudad</label>
+            <div class="input-wrap"><input id="quoteCiudad" placeholder="CDMX, Edomex..." /></div>
+          </div>
+          <div class="field">
+            <label>Nota (opcional)</label>
+            <div class="input-wrap"><input id="quoteNote" placeholder="Ej. condición de lanzamiento, ajustes acordados..." /></div>
+          </div>
+        </div>
+
+        <div class="pricing-panel">
+          <div class="pricing-row"><span>Piezas en el paquete</span><span id="pkgCount">0</span></div>
+          <div class="pricing-row grand"><span>Valor total del paquete (reposición)</span><span id="pkgValue">$0.00</span></div>
+          <div class="pricing-row">
+            <span>Mensualidad Año 1 — <input class="pct-input" id="pctAnio1" value="5" onchange="recalcPricing()">%</span>
+            <span class="mensualidad-val" id="mensualidadAnio1">$0.00 /mes</span>
+          </div>
+          <div class="pricing-row">
+            <span>Mensualidad Año 2 en adelante — <input class="pct-input" id="pctAnio2" value="3" onchange="recalcPricing()">%</span>
+            <span class="mensualidad-val" id="mensualidadAnio2">$0.00 /mes</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn-primary" style="max-width:280px" onclick="generateQuote()">📄 Generar Cotización</button>
+    </div>
+
+    <div id="view-historial" class="hidden">
+      <div class="topbar">
+        <div><h2>Historial</h2><div class="sub">Todas las cotizaciones generadas</div></div>
+      </div>
+      <div class="panel">
+        <table>
+          <thead><tr><th>Folio</th><th>Salón</th><th>Paquete</th><th>Valor total</th><th>Mensualidad Año 1</th><th>Fecha</th><th></th></tr></thead>
+          <tbody id="historialTableBody"></tbody>
+        </table>
+        <div id="historialEmpty" class="empty-state hidden">Aún no hay cotizaciones generadas.</div>
+      </div>
+    </div>
+
+    <div id="view-recibo" class="hidden">
+      <div class="topbar no-print">
+        <div><h2>Cotización generada</h2><div class="sub">Guárdala como PDF y mándala tú por WhatsApp o correo</div></div>
+        <button class="btn-accent-sm" onclick="showView('dashboard')">← Volver al Dashboard</button>
+      </div>
+
+      <div class="recibo-actions no-print">
+        <button class="btn-primary" style="max-width:220px;display:inline-block;margin-right:10px;" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+        <button class="btn-accent-sm" id="reciboWhatsBtn" style="margin-right:10px;">Abrir WhatsApp con mensaje</button>
+        <button class="btn-accent-sm" id="reciboMailBtn">Abrir correo con mensaje</button>
+        <p style="font-size:12px;color:var(--text-secondary);margin-top:14px;max-width:600px;">
+          Para mandarla con el PDF adjunto: 1) guarda el PDF con el primer botón (en la ventana de impresión, elige "Guardar como PDF"), 2) abre WhatsApp o correo con los botones de aquí arriba (ya traen el mensaje escrito), 3) adjunta ahí el PDF que guardaste en el paso 1.
+        </p>
+      </div>
+
+      <div class="recibo-card" id="reciboCard"></div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/catalog.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
