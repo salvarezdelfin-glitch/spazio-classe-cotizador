@@ -60,6 +60,21 @@ async function sbDelete(table, id) {
   }
 }
 
+async function sbUpdate(table, id, patch) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) throw new Error('update failed');
+    return true;
+  } catch (e) {
+    console.error('Supabase update error', e);
+    return false;
+  }
+}
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.remove('hidden');
@@ -70,6 +85,22 @@ function escapeHtml(s) {
 }
 function money(n) {
   return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const ESTATUS_OPTIONS = ['Enviada', 'En revisión', 'Aprobada', 'Rechazada'];
+function pillClassFor(estatus) {
+  const map = { 'Enviada': 'pill-enviada', 'En revisión': 'pill-revision', 'Aprobada': 'pill-aprobada', 'Rechazada': 'pill-rechazada' };
+  return map[estatus] || 'pill-enviada';
+}
+function estatusSelectHtml(c) {
+  const cur = c.estatus || 'Enviada';
+  const opts = ESTATUS_OPTIONS.map(o => `<option value="${o}" ${o === cur ? 'selected' : ''}>${o}</option>`).join('');
+  return `<select class="estatus-select ${pillClassFor(cur)}" onchange="updateQuoteEstatus(${c.id}, this.value)">${opts}</select>`;
+}
+async function updateQuoteEstatus(id, estatus) {
+  const ok = await sbUpdate('cotizaciones', id, { estatus });
+  if (ok) { showToast('Estatus actualizado a "' + estatus + '"'); await refreshAll(); }
+  else showToast('No se pudo actualizar el estatus');
 }
 
 // ---------- Login (Supabase Auth real + lista blanca app_users) ----------
@@ -213,10 +244,14 @@ function renderDashboard(salones, cotizaciones) {
     dashQuotes.innerHTML = cotizaciones.slice(0, 8).map(c => `
       <div class="quote-row">
         <div>
-          <div class="quote-client">${escapeHtml(c.salon)} <span class="pill pill-enviada">${escapeHtml(c.estatus || 'Enviada')}</span></div>
+          <div class="quote-client">${escapeHtml(c.salon)}</div>
           <div class="quote-meta">${escapeHtml(c.folio)} · ${escapeHtml(c.paquete_nombre || 'Personalizado')} · ${money(c.valor_total)} · Mensualidad ${money(c.mensualidad_anio1)}/mes</div>
         </div>
-        <button class="remove-row-btn" onclick="deleteQuote(${c.id})">✕</button>
+        <div class="quote-row-actions">
+          ${estatusSelectHtml(c)}
+          <button class="btn-ghost-sm" onclick="reprintQuote(${c.id})">Ver</button>
+          <button class="remove-row-btn" onclick="deleteQuote(${c.id})">✕</button>
+        </div>
       </div>
     `).join('');
   }
@@ -261,6 +296,7 @@ function renderHistorialTable(cotizaciones) {
       <td>${money(c.valor_total)}</td>
       <td>${money(c.mensualidad_anio1)}/mes</td>
       <td>${new Date(c.fecha).toLocaleDateString('es-MX')}</td>
+      <td>${estatusSelectHtml(c)}</td>
       <td>
         <button class="btn-ghost-sm" onclick="reprintQuote(${c.id})">Ver</button>
         <button class="remove-row-btn" onclick="deleteQuote(${c.id})">✕</button>
