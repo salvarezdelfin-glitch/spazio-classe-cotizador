@@ -186,14 +186,14 @@ async function handleLogout() {
 
 // ---------- Navegación ----------
 function showView(view) {
-  ['dashboard', 'salones', 'cotizador', 'historial', 'recibo'].forEach(v => {
+  ['dashboard', 'salones', 'cotizador', 'historial', 'reportes', 'recibo'].forEach(v => {
     document.getElementById('view-' + v).classList.toggle('hidden', v !== view);
   });
   document.querySelectorAll('.nav-item').forEach(el => {
     el.classList.toggle('active', el.dataset.view === view);
   });
   if (view === 'cotizador') prepareCotizador();
-  if (view === 'dashboard' || view === 'salones' || view === 'historial') refreshAll();
+  if (view === 'dashboard' || view === 'salones' || view === 'historial' || view === 'reportes') refreshAll();
 }
 
 async function refreshAll() {
@@ -206,6 +206,101 @@ async function refreshAll() {
   renderDashboard(salones, cotizaciones);
   renderSalonesTable(salones, cotizaciones);
   renderHistorialTable(cotizaciones);
+  renderReportes(cotizaciones);
+}
+
+function renderReportes(cotizaciones) {
+  const grid = document.getElementById('reportesStatsGrid');
+  if (!grid) return;
+
+  const total = cotizaciones.length;
+  const valorTotal = cotizaciones.reduce((s, c) => s + Number(c.valor_total || 0), 0);
+  const mensualidadA1Total = cotizaciones.reduce((s, c) => s + Number(c.mensualidad_anio1 || 0), 0);
+  const mensualidadA2Total = cotizaciones.reduce((s, c) => s + Number(c.mensualidad_anio2 || 0), 0);
+  const ticketProm = total ? valorTotal / total : 0;
+
+  grid.innerHTML = `
+    <div class="stat-card"><div class="label">Cotizaciones generadas</div><div class="value">${total}</div></div>
+    <div class="stat-card"><div class="label">Mensualidad Año 1 (suma)</div><div class="value">${money(mensualidadA1Total)}</div></div>
+    <div class="stat-card"><div class="label">Mensualidad Año 2+ (suma)</div><div class="value">${money(mensualidadA2Total)}</div></div>
+    <div class="stat-card"><div class="label">Ticket promedio (valor)</div><div class="value">${money(ticketProm)}</div></div>
+  `;
+
+  // Cotizaciones por estatus
+  const estatusColor = { 'Enviada': 'var(--blue)', 'En revisión': 'var(--gold)', 'Aprobada': 'var(--green)', 'Rechazada': 'var(--red)' };
+  const estatusCounts = {};
+  ESTATUS_OPTIONS.forEach(e => { estatusCounts[e] = 0; });
+  cotizaciones.forEach(c => {
+    const e = c.estatus || 'Enviada';
+    estatusCounts[e] = (estatusCounts[e] || 0) + 1;
+  });
+  const estatusEl = document.getElementById('reportesEstatusList');
+  if (!total) {
+    estatusEl.innerHTML = '<div class="empty-state">Aún no hay cotizaciones generadas.</div>';
+  } else {
+    estatusEl.innerHTML = ESTATUS_OPTIONS.map(e => {
+      const count = estatusCounts[e] || 0;
+      const pct = total ? Math.round((count / total) * 100) : 0;
+      return `
+        <div class="report-bar-row">
+          <div class="report-bar-head"><span class="name">${escapeHtml(e)}</span><span class="count">${count} · ${pct}%</span></div>
+          <div class="report-bar-track"><div class="report-bar-fill" style="width:${pct}%;background:${estatusColor[e] || 'var(--gold)'}"></div></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Paquetes más cotizados
+  const pkgStats = {};
+  cotizaciones.forEach(c => {
+    const nombre = c.paquete_nombre || 'Personalizado';
+    if (!pkgStats[nombre]) pkgStats[nombre] = { count: 0, valor: 0 };
+    pkgStats[nombre].count += 1;
+    pkgStats[nombre].valor += Number(c.valor_total || 0);
+  });
+  const pkgRanking = Object.entries(pkgStats).sort((a, b) => b[1].count - a[1].count);
+  const pkgEl = document.getElementById('reportesPaquetesList');
+  if (!pkgRanking.length) {
+    pkgEl.innerHTML = '<div class="empty-state">Aún no hay cotizaciones generadas.</div>';
+  } else {
+    const maxCount = pkgRanking[0][1].count;
+    pkgEl.innerHTML = pkgRanking.map(([nombre, s]) => {
+      const pct = maxCount ? Math.round((s.count / maxCount) * 100) : 0;
+      return `
+        <div class="report-bar-row">
+          <div class="report-bar-head"><span class="name">${escapeHtml(nombre)}</span><span class="count">${s.count} cotización${s.count === 1 ? '' : 'es'} · ${money(s.valor)}</span></div>
+          <div class="report-bar-track"><div class="report-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Mensualidad Año 1 por mes de cotización
+  const meses = {};
+  cotizaciones.forEach(c => {
+    if (!c.fecha) return;
+    const d = new Date(c.fecha);
+    const key = d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+    if (!meses[key]) meses[key] = { orden: d.getFullYear() * 12 + d.getMonth(), total: 0, count: 0 };
+    meses[key].total += Number(c.mensualidad_anio1 || 0);
+    meses[key].count += 1;
+  });
+  const mesesRanking = Object.entries(meses).sort((a, b) => b[1].orden - a[1].orden).slice(0, 12);
+  const mesesEl = document.getElementById('reportesMesesList');
+  if (!mesesRanking.length) {
+    mesesEl.innerHTML = '<div class="empty-state">Aún no hay cotizaciones generadas.</div>';
+  } else {
+    const maxTotal = Math.max(...mesesRanking.map(([, v]) => v.total));
+    mesesEl.innerHTML = mesesRanking.map(([mes, v]) => {
+      const pct = maxTotal ? Math.round((v.total / maxTotal) * 100) : 0;
+      return `
+        <div class="report-bar-row">
+          <div class="report-bar-head"><span class="name">${escapeHtml(mes)}</span><span class="count">${v.count} cotización${v.count === 1 ? '' : 'es'} · ${money(v.total)}/mes</span></div>
+          <div class="report-bar-track"><div class="report-bar-fill" style="width:${pct}%"></div></div>
+        </div>
+      `;
+    }).join('');
+  }
 }
 
 function renderDashboard(salones, cotizaciones) {

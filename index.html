@@ -46,6 +46,7 @@
       <button class="nav-item" data-view="salones" onclick="showView('salones')">🏛️ Salones</button>
       <button class="nav-item" data-view="cotizador" onclick="showView('cotizador')">🧾 Cotizador</button>
       <button class="nav-item" data-view="historial" onclick="showView('historial')">📋 Historial</button>
+      <button class="nav-item" data-view="reportes" onclick="showView('reportes')">📈 Reportes</button>
     </nav>
     <div class="sidebar-footer">
       <div class="user-pill">
@@ -190,6 +191,27 @@
           <tbody id="historialTableBody"></tbody>
         </table>
         <div id="historialEmpty" class="empty-state hidden">Aún no hay cotizaciones generadas.</div>
+      </div>
+    </div>
+
+    <div id="view-reportes" class="hidden">
+      <div class="topbar">
+        <div><h2>Reportes</h2><div class="sub">Mensualidad proyectada, estatus de cotizaciones y paquetes más pedidos</div></div>
+      </div>
+      <div class="cards-grid" id="reportesStatsGrid"></div>
+      <div class="panels-grid">
+        <div class="panel">
+          <h3>Cotizaciones por estatus</h3>
+          <div id="reportesEstatusList"></div>
+        </div>
+        <div class="panel">
+          <h3>Paquetes más cotizados</h3>
+          <div id="reportesPaquetesList"></div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:18px;">
+        <h3>Mensualidad Año 1 por mes de cotización</h3>
+        <div id="reportesMesesList"></div>
       </div>
     </div>
 
